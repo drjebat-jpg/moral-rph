@@ -1,62 +1,49 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=JetBrains+Mono:wght@400;500&display=swap');
-@import "tailwindcss";
-
-@theme {
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-serif: "Playfair Display", serif;
-  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+* {
+  box-sizing: border-box;
 }
 
-@keyframes shimmer {
-  100% { transform: translateX(100%); }
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
 }
 
-@layer base {
-  body {
-    @apply font-sans bg-[#0a0a0a] text-[#f0f0f0];
-  }
+body {
+  font-family: Arial, sans-serif;
+  background: #0f172a;
+  color: #ffffff;
 }
 
-.markdown-body {
-  @apply text-sm leading-relaxed;
+.app {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
 }
 
-.markdown-body h1 {
-  @apply text-2xl font-bold mb-4 border-b pb-2;
+.card {
+  width: 100%;
+  max-width: 700px;
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 16px;
+  padding: 32px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
 }
 
-.markdown-body h2 {
-  @apply text-xl font-semibold mt-6 mb-3;
+h1 {
+  margin-top: 0;
+  font-size: 2rem;
 }
 
-.markdown-body p {
-  @apply mb-4;
+p {
+  line-height: 1.6;
 }
 
-.markdown-body ul, .markdown-body ol {
-  @apply mb-4 pl-6;
-}
-
-.markdown-body ul {
-  @apply list-disc;
-}
-
-.markdown-body ol {
-  @apply list-decimal;
-}
-
-.markdown-body li {
-  @apply mb-1;
-}
-
-.markdown-body table {
-  @apply w-full border-collapse mb-4;
-}
-
-.markdown-body th, .markdown-body td {
-  @apply border border-gray-300 p-2 text-left;
-}
-
-.markdown-body th {
-  @apply bg-gray-100 font-semibold;
+code {
+  background: #0f172a;
+  padding: 2px 6px;
+  border-radius: 6px;
 }
