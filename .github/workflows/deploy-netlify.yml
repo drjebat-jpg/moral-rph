@@ -11,14 +11,58 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Deploy dist to Netlify
+      - name: Deploy dist to Netlify via API
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
           NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
         run: |
-          npm install -g netlify-cli
-          netlify deploy \
-            --dir=./dist \
-            --prod \
-            --auth="$NETLIFY_AUTH_TOKEN" \
-            --site="$NETLIFY_SITE_ID"
+          # Lookup real site ID from site name/subdomain
+          echo "Looking up site ID for: $NETLIFY_SITE_ID"
+          REAL_SITE_ID=$(curl -s \
+            -H "Authorization: Bearer $NETLIFY_AUTH_TOKEN" \
+            "https://api.netlify.com/api/v1/sites?filter=all&per_page=100" | \
+            python3 -c "
+          import sys, json
+          sites = json.load(sys.stdin)
+          site_id_input = '$NETLIFY_SITE_ID'
+          for s in sites:
+              name = s.get('name','')
+              subdomain = s.get('subdomain','')
+              sid = s.get('id','')
+              custom_domain = s.get('custom_domain','') or ''
+              if site_id_input in [name, subdomain, sid, custom_domain] or site_id_input in custom_domain:
+                  print(sid)
+                  break
+          ")
+
+          if [ -z "$REAL_SITE_ID" ]; then
+            echo "Site not found by name, trying direct site ID..."
+            REAL_SITE_ID="$NETLIFY_SITE_ID"
+          fi
+          echo "Using Site ID: $REAL_SITE_ID"
+
+          # Zip the dist folder
+          cd dist && zip -r /tmp/deploy.zip . && cd ..
+          echo "Zip size: $(ls -lh /tmp/deploy.zip | awk '{print $5}')"
+
+          # Deploy via Netlify API
+          RESPONSE=$(curl -s -X POST \
+            -H "Authorization: Bearer $NETLIFY_AUTH_TOKEN" \
+            -H "Content-Type: application/zip" \
+            --data-binary @/tmp/deploy.zip \
+            "https://api.netlify.com/api/v1/sites/$REAL_SITE_ID/deploys")
+
+          echo "Deploy response: $RESPONSE" | python3 -c "
+          import sys, json
+          resp = sys.stdin.read()
+          try:
+              r = json.loads(resp.split('Deploy response: ')[1])
+              print('Deploy ID:', r.get('id','?'))
+              print('State:', r.get('state','?'))
+              print('URL:', r.get('deploy_url','?') or r.get('url','?'))
+              if r.get('error_message'):
+                  print('ERROR:', r['error_message'])
+                  exit(1)
+          except Exception as e:
+              print('Raw:', resp)
+          "
