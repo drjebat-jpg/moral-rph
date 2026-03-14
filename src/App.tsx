@@ -1,14 +1,3 @@
-export default function App() {
-  return (
-    <main className="app">
-      <div className="card">
-        <h1>Moral RPH Assistant KauBytes</h1>
-        <p>Your app is deployed successfully on Render.</p>
-        <p>You can now add your real features back one by one.</p>
-      </div>
-    </main>
-  )
-}
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -34,7 +23,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { GoogleGenAI } from "@google/genai";
-import { DSKP_DATA } from './data/dskp';
+import { DSKP_DATA } from '../dskp';
 
 // --- Types ---
 
@@ -249,7 +238,7 @@ export default function App() {
     setIsGenerating(true);
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-      const model = "gemini-3.1-pro-preview";
+      const model = "gemini-2.0-flash";
       
       const isRingkas = formData.variation === 'Ringkas';
 
