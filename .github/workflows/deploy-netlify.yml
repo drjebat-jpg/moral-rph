@@ -11,58 +11,60 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Deploy dist to Netlify via API
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build app
+        run: npm run build
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+
+      - name: Install Netlify CLI
+        run: npm install -g netlify-cli
+
+      - name: Set GEMINI_API_KEY in Netlify env
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
           NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
         run: |
-          # Lookup real site ID from site name/subdomain
-          echo "Looking up site ID for: $NETLIFY_SITE_ID"
+          # Get real site ID from name
           REAL_SITE_ID=$(curl -s \
             -H "Authorization: Bearer $NETLIFY_AUTH_TOKEN" \
             "https://api.netlify.com/api/v1/sites?filter=all&per_page=100" | \
             python3 -c "
           import sys, json
           sites = json.load(sys.stdin)
-          site_id_input = '$NETLIFY_SITE_ID'
+          target = '$NETLIFY_SITE_ID'
           for s in sites:
-              name = s.get('name','')
-              subdomain = s.get('subdomain','')
-              sid = s.get('id','')
-              custom_domain = s.get('custom_domain','') or ''
-              if site_id_input in [name, subdomain, sid, custom_domain] or site_id_input in custom_domain:
-                  print(sid)
+              if target in [s.get('name',''), s.get('subdomain',''), s.get('id','')]:
+                  print(s['id'])
                   break
-          ")
+          " 2>/dev/null)
 
-          if [ -z "$REAL_SITE_ID" ]; then
-            echo "Site not found by name, trying direct site ID..."
-            REAL_SITE_ID="$NETLIFY_SITE_ID"
+          if [ -n "$REAL_SITE_ID" ]; then
+            echo "REAL_SITE_ID=$REAL_SITE_ID" >> $GITHUB_ENV
+            # Set GEMINI_API_KEY env var in Netlify
+            curl -s -X PATCH \
+              -H "Authorization: Bearer $NETLIFY_AUTH_TOKEN" \
+              -H "Content-Type: application/json" \
+              "https://api.netlify.com/api/v1/sites/$REAL_SITE_ID" \
+              -d "{\"build_settings\":{\"env\":{\"GEMINI_API_KEY\":\"${{ secrets.GEMINI_API_KEY }}\"}}}" \
+              | python3 -c "import sys,json; r=json.load(sys.stdin); print('Site updated:', r.get('id','?')[:8])" 2>/dev/null || true
           fi
-          echo "Using Site ID: $REAL_SITE_ID"
 
-          # Zip the dist folder
-          cd dist && zip -r /tmp/deploy.zip . && cd ..
-          echo "Zip size: $(ls -lh /tmp/deploy.zip | awk '{print $5}')"
-
-          # Deploy via Netlify API
-          RESPONSE=$(curl -s -X POST \
-            -H "Authorization: Bearer $NETLIFY_AUTH_TOKEN" \
-            -H "Content-Type: application/zip" \
-            --data-binary @/tmp/deploy.zip \
-            "https://api.netlify.com/api/v1/sites/$REAL_SITE_ID/deploys")
-
-          echo "Deploy response: $RESPONSE" | python3 -c "
-          import sys, json
-          resp = sys.stdin.read()
-          try:
-              r = json.loads(resp.split('Deploy response: ')[1])
-              print('Deploy ID:', r.get('id','?'))
-              print('State:', r.get('state','?'))
-              print('URL:', r.get('deploy_url','?') or r.get('url','?'))
-              if r.get('error_message'):
-                  print('ERROR:', r['error_message'])
-                  exit(1)
-          except Exception as e:
-              print('Raw:', resp)
-          "
+      - name: Deploy to Netlify (build + functions)
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+        run: |
+          SITE_ID="${REAL_SITE_ID:-${{ secrets.NETLIFY_SITE_ID }}}"
+          netlify deploy \
+            --dir=./dist \
+            --functions=./netlify/functions \
+            --prod \
+            --auth="$NETLIFY_AUTH_TOKEN" \
+            --site="$SITE_ID"

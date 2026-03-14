@@ -340,16 +340,29 @@ export default function App() {
         Refleksi: [Sediakan template kosong atau contoh]
       `;
 
-      const result = await ai.models.generateContent({
-        model,
-        contents: prompt,
-        config: {
-          systemInstruction,
-          temperature: 0.7,
-        }
-      });
+      let text = '';
 
-      let text = result.text || '';
+      // Use serverless proxy on Netlify, direct API elsewhere
+      const isNetlify = typeof window !== 'undefined' &&
+        window.location.hostname.includes('netlify.app');
+
+      if (isNetlify) {
+        const res = await fetch('/api/generate-rph', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt, systemInstruction })
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        text = data.text || '';
+      } else {
+        const result = await ai.models.generateContent({
+          model,
+          contents: prompt,
+          config: { systemInstruction, temperature: 0.7 }
+        });
+        text = result.text || '';
+      }
       // Remove markdown symbols like **, *, ###, #
       text = text.replace(/[*#]/g, '');
       
